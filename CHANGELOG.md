@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `opentelemetry-isntrumentation-sqlalchemy` Add callbacks to sqlalchemy events.
+  ([#1419](https://github.com/open-telemetry/opentelemetry-python-contrib/pull/1419))
 - `opentelemetry-instrumentation-grpc` add supports to filter requests to instrument. ([#1241](https://github.com/open-telemetry/opentelemetry-python-contrib/pull/1241))
 - Flask sqlalchemy psycopg2 integration
   ([#1224](https://github.com/open-telemetry/opentelemetry-python-contrib/pull/1224))
