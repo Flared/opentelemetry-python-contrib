@@ -16,6 +16,7 @@ import urllib.parse
 from re import escape, sub
 from typing import Dict, Sequence
 
+import wrapt
 from wrapt import ObjectProxy
 
 from opentelemetry import context, trace
@@ -152,3 +153,30 @@ def _python_path_without_directory(python_path, directory, path_separator):
         "",
         python_path,
     )
+
+
+def safe_wrap(module: object, name: str, wrapper: object) -> None:
+    def safe_wrapper(wrapped, instance, args, kwargs) -> object:
+        called = False
+        return_value = None
+        error = None
+
+        def wrapped_proxy(*args, **kwargs):
+            nonlocal called, return_value, error
+            called = True
+            try:
+                return_value = wrapped(*args, **kwargs)
+            except:
+                error = sys.exc_info()
+
+        try:
+            wrapper(wrapped_proxy, instance, args, kwargs)
+        finally:
+            if not called:
+                return wrapped(*args, **kwargs)
+            elif error is None:
+                return return_value
+            else:
+                raise error from error.__cause__
+
+    wrapt.wrap_function_wrapper(module, name, safe_wrapper)

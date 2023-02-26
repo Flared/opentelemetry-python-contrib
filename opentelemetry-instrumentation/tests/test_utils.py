@@ -19,6 +19,7 @@ from opentelemetry.instrumentation.sqlcommenter_utils import _add_sql_comment
 from opentelemetry.instrumentation.utils import (
     _python_path_without_directory,
     http_status_to_status_code,
+    safe_wrap,
 )
 from opentelemetry.trace import StatusCode
 
@@ -186,3 +187,69 @@ class TestUtils(unittest.TestCase):
         )
 
         self.assertEqual(commented_sql_without_semicolon, "Select 1")
+
+    def test_safe_wrap(self):
+        def assert_wrapper(wrapper):
+            class Object:
+                def __init__(self):
+                    self.called = 0
+
+                def wrapped(self, a, b):
+                    self.called += 1
+                    return (a, b)
+
+            safe_wrap(Object, "wrapped", wrapper)
+            obj = Object()
+            assert obj.wrapped(1, b=2) == (1, 2)
+            assert obj.called == 1
+
+        def assert_wrapper_exception(wrapper):
+            class Object:
+                def __init__(self):
+                    self.called = 0
+
+                def wrapped(self, a, b):
+                    self.called += 1
+                    try:
+                        raise ValueError(a)
+                    except Exception as e:
+                        raise ValueError(b) from e
+
+            safe_wrap(Object, "wrapped", wrapper)
+            obj = Object()
+            try:
+                obj.wrapped(1, b=2)
+                assert False
+            except Exception as e:
+                e.args == (1,)
+                e.__cause__.args == (2,)
+
+            assert obj.called == 1
+
+        # If wrapper forget to return wrapped, wrapped value should still be
+        # returned.
+        def wrapper_no_return(wrapped, instance, args, kwargs):
+            instance(*args, **kwargs)
+            return None
+
+        # If wrapper forget to call wrapped, wrapped should still be called.
+        def wrapper_no_call(wrapped, instance, args, kwargs):
+            return None
+
+        # If wrapper raise an exception, wrapped should still be called and its
+        # return value returned.
+        def wrapper_raise_before(wrapped, instance, args, kwargs):
+            raise ValueError()
+
+        def wrapper_raise_after(wrapped, instance, args, kwargs):
+            instance(*args, **kwargs)
+            raise ValueError()
+
+        for wrapper in (
+            wrapper_no_call,
+            wrapper_no_return,
+            wrapper_raise_after,
+            wrapper_raise_before,
+        ):
+            assert_wrapper(wrapper)
+            assert_wrapper_exception(wrapper)
